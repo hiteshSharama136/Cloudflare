@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cloudflared-tunnel-${zone_name}
+  name: cloudflared-tunnel-${zone_name}
+  namespace: ${namespace}
+spec:
+  selector:
+    matchLabels:
+      app: cloudflared-tunnel-${zone_name}
+  replicas: 2 # You could also consider elastic scaling for this deployment
+  template:
+    metadata:
+      labels:
+        app: cloudflared-tunnel-${zone_name}
+    spec:
+      containers:
+      - name: cloudflared
+        image: cloudflare/cloudflared:latest
+        args:
+        - tunnel
+        - --config
+        - /etc/cloudflared/config/config.yaml
+        - run
+        livenessProbe:
+          httpGet:
+            path: /ready
+            port: 2000
+          failureThreshold: 1
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        volumeMounts:
+        - name: config
+          mountPath: /etc/cloudflared/config
+          readOnly: true
+        - name: creds
+          mountPath: /etc/cloudflared/creds
+          readOnly: true
+      volumes:
+      - name: creds
+        secret:
+          secretName: cloudflared-tunnel-credentials-${zone_name}
+      - name: config
+        configMap:
+          name: cloudflared-tunnel-configmap-${zone_name}
+          items:
+          - key: config.yaml
+            path: config.yaml
